@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>org.chenile</groupId>
+    <artifactId>chenile-security-parent</artifactId>
+    <version>${revision}</version>
+
+    <modules>
+			<module>chenile-security</module>
+			<module>chenile-security-api</module>
+			<module>cucumber-sec-utils</module>
+			<module>security-interceptor</module>
+    </modules>
+
+    <packaging>pom</packaging>
+
+    <parent>
+        <groupId>org.chenile</groupId>
+        <artifactId>chenile-parent</artifactId>
+        <version>2.0.1</version>
+    </parent>
+
+    <properties>
+        <revision>${chenile.security.version}</revision>
+    </properties>
+    <licenses>
+        <license>
+            <name>MIT License</name>
+            <url>http://www.opensource.org/licenses/mit-license.php</url>
+        </license>
+    </licenses>
+
+
+    <distributionManagement>
+        <site>
+            <id>website</id>
+            <url>http://chenile.org</url>
+        </site>
+    </distributionManagement>
+
+</project>
