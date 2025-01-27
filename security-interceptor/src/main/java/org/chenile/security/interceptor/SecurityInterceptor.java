@@ -2,6 +2,7 @@ package org.chenile.security.interceptor;
 
 import org.chenile.base.exception.ErrorNumException;
 import org.chenile.core.context.ChenileExchange;
+import org.chenile.core.context.ContextContainer;
 import org.chenile.core.context.HeaderUtils;
 import org.chenile.core.interceptors.BaseChenileInterceptor;
 import org.chenile.http.Constants;
@@ -12,6 +13,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContext;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
+import org.springframework.security.oauth2.server.resource.authentication.BearerTokenAuthentication;
 
 import java.util.Arrays;
 
@@ -31,12 +37,26 @@ public class SecurityInterceptor extends BaseChenileInterceptor {
 	@Autowired
 	SecurityService securityService;
 
+	@Autowired
+	private ContextContainer contextContainer;
+
 	@Override
 	protected void doPreProcessing(ChenileExchange exchange) {
 		if(!securityService.doesCurrentUserHaveGuardingAuthorities(exchange)){
 			throw new ErrorNumException(HttpStatus.FORBIDDEN.value(), ErrorCodes.FORBIDDEN.getSubError(),
 					new Object[]{});
 		}
+		Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+		String user = "1";
+		if(authentication instanceof BearerTokenAuthentication bearerTokenAuthentication){
+			user = String.valueOf(bearerTokenAuthentication.getTokenAttributes().getOrDefault("email","1"));
+		}
+		if(authentication instanceof OAuth2AuthenticationToken oAuth2AuthenticationToken){
+			user = String.valueOf(oAuth2AuthenticationToken.getPrincipal().getAttributes().getOrDefault("email","1"));
+		}
+		exchange.setHeader(HeaderUtils.AUTH_USER_KEY, user);
+		contextContainer.put(HeaderUtils.AUTH_USER_KEY,user);
+
 	}
 	/**
 	 * This bypasses the logic only if the security config is configured to be unprotected or
