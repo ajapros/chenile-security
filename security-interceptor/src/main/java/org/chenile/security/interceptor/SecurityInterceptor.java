@@ -17,7 +17,11 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
+import org.springframework.security.oauth2.core.DefaultOAuth2AuthenticatedPrincipal;
+import org.springframework.security.oauth2.core.oidc.user.DefaultOidcUser;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.BearerTokenAuthentication;
+import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
 
 import java.util.Arrays;
 
@@ -48,14 +52,25 @@ public class SecurityInterceptor extends BaseChenileInterceptor {
 		}
 		Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
 		String user = "1";
+		String token = "Bearer ";
+
 		if(authentication instanceof BearerTokenAuthentication bearerTokenAuthentication){
 			user = String.valueOf(bearerTokenAuthentication.getTokenAttributes().getOrDefault("email","1"));
+			token = token + bearerTokenAuthentication.getToken().getTokenValue();
 		}
 		if(authentication instanceof OAuth2AuthenticationToken oAuth2AuthenticationToken){
 			user = String.valueOf(oAuth2AuthenticationToken.getPrincipal().getAttributes().getOrDefault("email","1"));
+			DefaultOidcUser oidcUser = (DefaultOidcUser) authentication.getPrincipal();
+			token = token + oidcUser.getIdToken().getTokenValue();
 		}
+
 		exchange.setHeader(HeaderUtils.AUTH_USER_KEY, user);
 		contextContainer.put(HeaderUtils.AUTH_USER_KEY,user);
+
+
+		exchange.setHeader(HeaderUtils.AUTH_TOKEN_HEADER, token);
+		contextContainer.put(HeaderUtils.AUTH_TOKEN_HEADER,token);
+
 
 	}
 	/**
