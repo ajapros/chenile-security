@@ -67,9 +67,8 @@ public class SecurityInterceptor extends BaseChenileInterceptor {
 		exchange.setHeader(HeaderUtils.AUTH_USER_KEY, user);
 		contextContainer.put(HeaderUtils.AUTH_USER_KEY,user);
 
-
-		exchange.setHeader(HeaderUtils.AUTH_TOKEN_HEADER, token);
-		contextContainer.put(HeaderUtils.AUTH_TOKEN_HEADER,token);
+		exchange.setHeader(HeaderUtils.AUTH_X_TOKEN_HEADER, token);
+		contextContainer.put(HeaderUtils.AUTH_X_TOKEN_HEADER,token);
 
 
 	}
