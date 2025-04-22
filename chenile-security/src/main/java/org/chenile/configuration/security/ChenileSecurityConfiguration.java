@@ -10,6 +10,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.convert.converter.Converter;
@@ -38,11 +39,18 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtAut
 import org.springframework.security.oauth2.server.resource.authentication.JwtBearerTokenAuthenticationConverter;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.SimpleUrlAuthenticationFailureHandler;
+import org.springframework.web.cors.CorsConfiguration;
 
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 
 @Configuration
+@ConditionalOnProperty(
+        name = "security.config.type",
+        havingValue = "false",
+        matchIfMissing = true // load this if the property is missing
+)
 public class ChenileSecurityConfiguration {
     private final Logger logger = LoggerFactory.getLogger(ChenileSecurityConfiguration.class);
     @Autowired
@@ -51,27 +59,59 @@ public class ChenileSecurityConfiguration {
     String clientId;
     @Value("${chenile.security.client.secret}")
     String clientSecret;
-    @Value("${chenile.security.login.success.url:/}")
-    String loginSuccessUrl;
-    @Value("${chenile.security.login.failure.url:/}")
-    String loginFailureUrl;
-    @Value("${chenile.security.ignore:false}")
-    boolean ignoreSecurity;
+
+
+    @Value("${chenile.security.keycloak.host}")
+    private String keycloakAuthServerUrl;
+
+    @Value("${chenile.security.keycloak.base.realm}")
+    private String realm;
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-        if (ignoreSecurity)
-            return http.build();
-        http.csrf().disable().
-                authorizeHttpRequests(
-                        (authorize) -> authorize.anyRequest().authenticated())
+
+        String logoutUrl = keycloakAuthServerUrl + "/realms/" + realm +
+                "/protocol/openid-connect/logout"
+                //+"?redirect_uri=http://localhost:8080/app"  // Redirection not working, for now custom page required
+                 ;
+
+        http.csrf().disable().cors(cors -> cors.configurationSource(request -> {
+                    CorsConfiguration configuration = new CorsConfiguration();
+                    configuration.setAllowedOrigins(Arrays.asList("http://localhost:9000",
+                            "http://localhost:8080", "http://localhost:8000"));
+                    configuration.setAllowedMethods(Arrays.asList("POST", "GET", "DELETE", "PUT", "OPTIONS"));
+                    configuration.setAllowedHeaders(Arrays.asList("*"));
+                    //configuration.setAllowCredentials(true);
+                    return configuration;
+                })).authorizeHttpRequests(
+                        (authorize) -> authorize
+                                .requestMatchers("/static/**").permitAll()
+                                .anyRequest().authenticated())
+
+
+                .logout(l->
+                        l.logoutUrl("/app/logout")
+
+                                .invalidateHttpSession(true)
+                                .clearAuthentication(true)
+                                .deleteCookies("JSESSIONID")
+                                .logoutSuccessUrl(logoutUrl)
+//                                .logoutSuccessHandler(new LogoutSuccessHandler() {
+//                                    @Override
+//                                    public void onLogoutSuccess(HttpServletRequest request, HttpServletResponse response, Authentication authentication) throws IOException, ServletException {
+//                                        System.out.println("I am logout");
+//                                    }
+//                                })
+
+                        //Either handler works or success url
+
+
+                )
                 .oauth2Login(auth -> {
                     // auth.clientRegistrationRepository(httpRequest-> client(httpRequest));
                     auth.authorizationEndpoint().authorizationRequestResolver(resolver());
-                    if(loginSuccessUrl != null)
-                         auth.defaultSuccessUrl(loginSuccessUrl);
-                    if(loginFailureUrl != null)
-                        auth.failureHandler(new SimpleUrlAuthenticationFailureHandler(loginFailureUrl));
+                    auth.defaultSuccessUrl("/")
+                            .failureHandler(new SimpleUrlAuthenticationFailureHandler("/"));
                 })
                 .oauth2Client(Customizer.withDefaults())
                 .oauth2ResourceServer((oauth2) ->
@@ -86,9 +126,9 @@ public class ChenileSecurityConfiguration {
             @Override
             public OAuth2AuthorizationRequest resolve(HttpServletRequest request) {
                 String tenantId = request.getHeader(HeaderUtils.TENANT_ID_KEY);
-               // String authBaseUri = "http://" + connectionDetails.host + ":" + connectionDetails.httpPort +
+                // String authBaseUri = "http://" + connectionDetails.host + ":" + connectionDetails.httpPort +
                 String authBaseUri = connectionDetails.host +
-                        "/realms" + tenantId + "/protocol/openid-connect/auth";
+                        "/realms/" + tenantId + "/protocol/openid-connect/auth";
                 DefaultOAuth2AuthorizationRequestResolver resolver = new
                         DefaultOAuth2AuthorizationRequestResolver(clientRegistrationRepository(tenantId), authBaseUri);
                 return resolver.resolve(request);
@@ -109,7 +149,8 @@ public class ChenileSecurityConfiguration {
     }
 
     // Create the client registration repository once per tenant. Reuse it from the second time
-    private final Map<String,ClientRegistrationRepository> repositories = new HashMap<>();
+    private final Map<String, ClientRegistrationRepository> repositories = new HashMap<>();
+
     private ClientRegistrationRepository clientRegistrationRepository(String tenantId) {
         return repositories.computeIfAbsent(tenantId, (tenant) ->
                 new InMemoryClientRegistrationRepository(client(tenant)));
@@ -130,12 +171,13 @@ public class ChenileSecurityConfiguration {
         ClientRegistration.Builder builder = CommonOAuth2Provider.OKTA.getBuilder("authz_servlet");
         builder.clientId(clientId);
         builder.clientSecret(clientSecret);
+        //builder.scope("openid", "profile","basic","role_list", "email","roles","test.normal" ,"test.premium");
         builder.issuerUri(keycloakBaseUrl(realm));
         builder.authorizationUri(keycloakOpenIdUrl(realm) + "auth");
         builder.tokenUri(keycloakOpenIdUrl(realm) + "token");
         builder.jwkSetUri(keycloakOpenIdUrl(realm) + "certs");
         builder.userInfoUri(keycloakOpenIdUrl(realm) + "userinfo");
-        builder.scope("openid", "profile", "email");
+        builder.scope("openid", "profile", "email","roles");
         return builder.build();
     }
 
@@ -146,17 +188,19 @@ public class ChenileSecurityConfiguration {
         };
     }
 
-    private final Map<String,AuthenticationManager> authenticationManagers = new HashMap<>();
+    private final Map<String, AuthenticationManager> authenticationManagers = new HashMap<>();
+
     /**
      * Here we take the tenant ID to construct a specific URL (with the realm as tenant ID) and
      * return an Authentication Manager for that realm. <br/>
      * Since the URL that is constructed depends on the validity of the tenant ID, it is possible
      * that we may get a 404 from keycloak. To take care of this, we will recast all exceptions
      * to "InvalidBearerTokenException" so that spring security will give a 401 in all those cases.
+     *
      * @param tenantId the tenant ID
      * @return the Authentication manager for the particular tenant ID
      */
-    private AuthenticationManager getAuthenticationManager(String tenantId){
+    private AuthenticationManager getAuthenticationManager(String tenantId) {
         return authenticationManagers.computeIfAbsent(tenantId, this::jwt);
     }
 
@@ -164,15 +208,15 @@ public class ChenileSecurityConfiguration {
         JwtAuthenticationProvider authenticationProvider = new JwtAuthenticationProvider(jwtDecoder(tenantId));
         authenticationProvider.setJwtAuthenticationConverter(jwtBearerTokenAuthenticationConverter());
 
-        return new ProviderManager(authenticationProvider){
+        return new ProviderManager(authenticationProvider) {
             @Override
             public Authentication authenticate(Authentication authentication) throws AuthenticationException {
                 try {
                     return super.authenticate(authentication);
-                }catch(Throwable t){
-                    if (!t.getClass().isAssignableFrom(InvalidBearerTokenException.class)){
+                } catch (Throwable t) {
+                    if (!t.getClass().isAssignableFrom(InvalidBearerTokenException.class)) {
                         logger.warn("Authentication error occurred. Recasting it to InvalidBearerTokenException.", t);
-                        throw new InvalidBearerTokenException("Cannot authenticate bearer token",t);
+                        throw new InvalidBearerTokenException("Cannot authenticate bearer token", t);
                     }
                     throw t;
                 }
@@ -185,7 +229,7 @@ public class ChenileSecurityConfiguration {
     }
 
     private String keycloakBaseUrl(String realm) {
-       return connectionDetails.host  + "/realms/" + realm;
+        return connectionDetails.host + "/realms/" + realm;
     }
 
     private String keycloakOpenIdUrl(String realm) {
@@ -203,7 +247,7 @@ public class ChenileSecurityConfiguration {
     }
 
     @Bean
-    SecurityService securityService(){
+    SecurityService securityService() {
         return new SecurityServiceImpl();
     }
 }
