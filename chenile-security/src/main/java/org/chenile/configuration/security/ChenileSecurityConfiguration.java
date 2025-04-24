@@ -85,7 +85,6 @@ public class ChenileSecurityConfiguration {
                     return configuration;
                 })).authorizeHttpRequests(
                         (authorize) -> authorize
-                                .requestMatchers("/static/**").permitAll()
                                 .anyRequest().authenticated())
 
 
