@@ -1,6 +1,7 @@
+read -p "Comments:" comment
 new_version=$(cat chenile-security-version.txt)
 git add .
-git commit -m "${new_version}"
+git commit -m "${new_version}: ${comment}"
 git push origin main
 make tag tag=$new_version
 make push-tags

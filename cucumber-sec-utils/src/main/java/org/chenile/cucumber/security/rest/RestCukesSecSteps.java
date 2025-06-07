@@ -1,6 +1,5 @@
 package org.chenile.cucumber.security.rest;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import cucumber.api.java.Before;
 import cucumber.api.java.en.When;
 import org.chenile.cucumber.CukesContext;
@@ -9,7 +8,6 @@ import org.chenile.security.test.BaseSecurityTest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -23,10 +21,7 @@ import static org.chenile.security.test.BaseSecurityTest.getToken;
 @ActiveProfiles("unittest")
 @AutoConfigureMockMvc
 public class RestCukesSecSteps {
-    @Autowired
-    private MockMvc mvc;
     @Autowired private KeycloakConnectionDetails connectionDetails;
-    protected final ObjectMapper objectMapper = new ObjectMapper();
 
     CukesContext context = CukesContext.CONTEXT;
 
