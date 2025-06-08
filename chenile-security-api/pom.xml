@@ -12,8 +12,8 @@
 
 	<artifactId>chenile-security-api</artifactId>
 	<packaging>jar</packaging>
+	<name>Chenile Security API definitions</name>
 
-	<name>chenile-security-api</name>
 	<dependencies>
 		<dependency>
 			<groupId>org.chenile</groupId>

@@ -7,6 +7,7 @@
     <groupId>org.chenile</groupId>
     <artifactId>chenile-security-parent</artifactId>
     <version>${revision}</version>
+    <name>Chenile Security Parent</name>
 
     <modules>
 			<module>chenile-security</module>
