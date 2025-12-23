@@ -1,12 +1,12 @@
 package org.chenile.cucumber.security.rest;
 
-import cucumber.api.java.Before;
-import cucumber.api.java.en.When;
+import io.cucumber.java.Before;
+import io.cucumber.java.en.When;
 import org.chenile.cucumber.CukesContext;
 import org.chenile.security.KeycloakConnectionDetails;
 import org.chenile.security.test.BaseSecurityTest;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.test.context.ActiveProfiles;
 
 import java.util.HashMap;
@@ -25,7 +25,8 @@ public class RestCukesSecSteps {
 
     CukesContext context = CukesContext.CONTEXT;
 
-    @Before public void before(){
+    @Before
+    public void before(){
         connectionDetails.host = BaseSecurityTest.getUrl();
         connectionDetails.httpPort = BaseSecurityTest.getHttpPort();
     }

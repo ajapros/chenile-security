@@ -3,6 +3,8 @@ package org.chenile.security.test;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import dasniko.testcontainers.keycloak.KeycloakContainer;
 import org.chenile.cucumber.security.rest.RestCukesSecSteps;
+import org.junit.AfterClass;
+import org.junit.BeforeClass;
 import org.junit.ClassRule;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -49,18 +51,37 @@ import java.util.List;
  */
 public class BaseSecurityTest {
 
-   @ClassRule
-   public static KeycloakContainer keycloak =
-         new KeycloakContainer()
-                .withRealmImportFiles("config/realm-import-tenant0.json",
-                "config/realm-import-tenant1.json")
-                ;
-    static{
-        keycloak.start();
-        connDetails = new ConnDetails(keycloak.getHost(),keycloak.getHttpPort(),
-                "tenant0");
+
+    private static KeycloakContainer keycloak;
+    private static ConnDetails connDetails;
+
+    @BeforeClass
+    public static void startContainer() {
+        keycloak = new KeycloakContainer()
+                .withRealmImportFiles(
+                        "config/realm-import-tenant0.json",
+                        "config/realm-import-tenant1.json"
+                );
+
+        if (!keycloak.isRunning()) {
+            keycloak.start();
+        }
+
+        connDetails = new ConnDetails(
+                keycloak.getHost(),
+                keycloak.getHttpPort(),
+                "tenant0"
+        );
     }
-    public static ConnDetails connDetails;
+
+    @AfterClass
+    public static void stopContainer() {
+        if (keycloak != null && keycloak.isRunning()) {
+            keycloak.stop();
+        }
+    }
+
+
     public static String getHost(){
         return keycloak.getHost();
     }

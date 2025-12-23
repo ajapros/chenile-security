@@ -75,43 +75,43 @@ public class ChenileSecurityConfiguration {
                 //+"?redirect_uri=http://localhost:8080/app"  // Redirection not working, for now custom page required
                  ;
 
-        http.csrf().disable().cors(cors -> cors.configurationSource(request -> {
+        http
+                .csrf(csrf -> csrf.disable())
+                .cors(cors -> cors.configurationSource(request -> {
                     CorsConfiguration configuration = new CorsConfiguration();
-                    configuration.setAllowedOrigins(Arrays.asList("http://localhost:9000",
-                            "http://localhost:8080", "http://localhost:8000"));
-                    configuration.setAllowedMethods(Arrays.asList("POST", "GET", "DELETE", "PUT", "OPTIONS"));
+                    configuration.setAllowedOrigins(Arrays.asList(
+                            "http://localhost:9000",
+                            "http://localhost:8080",
+                            "http://localhost:8000"
+                    ));
+                    configuration.setAllowedMethods(Arrays.asList(
+                            "POST", "GET", "DELETE", "PUT", "OPTIONS"
+                    ));
                     configuration.setAllowedHeaders(Arrays.asList("*"));
-                    //configuration.setAllowCredentials(true);
+                    // configuration.setAllowCredentials(true);
                     return configuration;
-                })).authorizeHttpRequests(
-                        (authorize) -> authorize
-                                .anyRequest().authenticated())
+                }))
+                .authorizeHttpRequests(authorize -> authorize
+                        .anyRequest().authenticated()
+                )
+                .logout(logout -> logout
+                        .logoutUrl("/app/logout")
+                        .invalidateHttpSession(true)
+                        .clearAuthentication(true)
+                        .deleteCookies("JSESSIONID")
+                        .logoutSuccessUrl(logoutUrl)
 
-
-                .logout(l->
-                        l.logoutUrl("/app/logout")
-
-                                .invalidateHttpSession(true)
-                                .clearAuthentication(true)
-                                .deleteCookies("JSESSIONID")
-                                .logoutSuccessUrl(logoutUrl)
-//                                .logoutSuccessHandler(new LogoutSuccessHandler() {
-//                                    @Override
-//                                    public void onLogoutSuccess(HttpServletRequest request, HttpServletResponse response, Authentication authentication) throws IOException, ServletException {
-//                                        System.out.println("I am logout");
-//                                    }
-//                                })
-
-                        //Either handler works or success url
 
 
                 )
-                .oauth2Login(auth -> {
-                    // auth.clientRegistrationRepository(httpRequest-> client(httpRequest));
-                    auth.authorizationEndpoint().authorizationRequestResolver(resolver());
-                    auth.defaultSuccessUrl("/")
-                            .failureHandler(new SimpleUrlAuthenticationFailureHandler("/"));
-                })
+                .oauth2Login(oauth2 -> oauth2
+                        .authorizationEndpoint(authorization -> authorization
+                                .authorizationRequestResolver(resolver())
+                        )
+                        .defaultSuccessUrl("/")
+                        .failureHandler(new SimpleUrlAuthenticationFailureHandler("/"))
+                )
+
                 .oauth2Client(Customizer.withDefaults())
                 .oauth2ResourceServer((oauth2) ->
                         oauth2.authenticationManagerResolver(authenticationManagerResolver())
@@ -126,11 +126,22 @@ public class ChenileSecurityConfiguration {
             public OAuth2AuthorizationRequest resolve(HttpServletRequest request) {
                 String tenantId = request.getHeader(HeaderUtils.TENANT_ID_KEY);
                 // String authBaseUri = "http://" + connectionDetails.host + ":" + connectionDetails.httpPort +
-                String authBaseUri = connectionDetails.host +
-                        "/realms/" + tenantId + "/protocol/openid-connect/auth";
-                DefaultOAuth2AuthorizationRequestResolver resolver = new
-                        DefaultOAuth2AuthorizationRequestResolver(clientRegistrationRepository(tenantId), authBaseUri);
+//                String authBaseUri = connectionDetails.host +
+//                        "/realms/" + tenantId + "/protocol/openid-connect/auth";
+//                DefaultOAuth2AuthorizationRequestResolver resolver = new
+//                        DefaultOAuth2AuthorizationRequestResolver(clientRegistrationRepository(tenantId), authBaseUri);
+//                return resolver.resolve(request);
+
+                String baseUri = "/oauth2/authorization";
+
+                DefaultOAuth2AuthorizationRequestResolver resolver =
+                        new DefaultOAuth2AuthorizationRequestResolver(
+                                clientRegistrationRepository(tenantId),
+                                baseUri
+                        );
+
                 return resolver.resolve(request);
+
             }
 
             @Override
