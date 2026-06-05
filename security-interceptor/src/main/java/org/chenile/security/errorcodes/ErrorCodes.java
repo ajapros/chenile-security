@@ -5,14 +5,14 @@ public enum ErrorCodes {
 	// Each service must have its own sub error range so that it is easy
 	// to know the service from the sub error range
 	// Make sure that the sub error number matches the one in the resources
-	UNAUTHENTICATED(11000), FORBIDDEN(11001);
+	UNAUTHENTICATED("11000"), FORBIDDEN("11001");
 
-	private final int subError;
-	private ErrorCodes(int subError) {
+	private final String subError;
+	private ErrorCodes(String subError) {
 		this.subError = subError;
 	}
 	
-	public int getSubError() {
+	public String getSubError() {
 		return this.subError;
 	}
 }

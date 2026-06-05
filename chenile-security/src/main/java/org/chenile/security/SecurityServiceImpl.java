@@ -133,7 +133,7 @@ public class SecurityServiceImpl implements SecurityService {
             return true;
         String[] currentAuthorities = getCurrentAuthorities();
         if(currentAuthorities == null)
-            throw new ErrorNumException(HttpStatus.UNAUTHORIZED.value(),10000,new Object[]{});
+            throw new ErrorNumException(HttpStatus.UNAUTHORIZED.value(),"10000",new Object[]{});
         return guardingAuthoritiesFoundInCurrentAuthorities(guardingAuthorities,currentAuthorities);
     }
 
