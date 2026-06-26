@@ -58,13 +58,4 @@
         </site>
     </distributionManagement>
 
-    <profiles>
-        <profile>
-            <id>auth-integration-tests</id>
-            <modules>
-                <module>auth-framework/integration-tests</module>
-            </modules>
-        </profile>
-    </profiles>
-
 </project>
