@@ -8,10 +8,16 @@
     <name>Chenile Security Parent</name>
 
     <modules>
-			<module>chenile-security</module>
-			<module>chenile-security-api</module>
-			<module>cucumber-sec-utils</module>
-			<module>security-interceptor</module>
+        <module>legacy-security/chenile-security-api</module>
+        <module>legacy-security/chenile-security</module>
+        <module>legacy-security/security-interceptor</module>
+        <module>legacy-security/cucumber-sec-utils</module>
+        <module>auth-framework/core</module>
+        <module>auth-framework/starters/resource-server</module>
+        <module>auth-framework/starters/gateway</module>
+        <module>auth-framework/starters/auth-server</module>
+        <module>auth-framework/auth-server</module>
+        <module>auth-framework/gateway</module>
     </modules>
 
     <packaging>pom</packaging>
@@ -19,12 +25,24 @@
     <parent>
         <groupId>org.chenile</groupId>
         <artifactId>chenile-parent</artifactId>
-        <version>2.1.22</version>
+        <version>2.1.24</version>
     </parent>
 
     <properties>
         <revision>${chenile.security.version}</revision>
+        <spring-cloud.version>2025.1.2</spring-cloud.version>
     </properties>
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>org.springframework.cloud</groupId>
+                <artifactId>spring-cloud-dependencies</artifactId>
+                <version>${spring-cloud.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
     <licenses>
         <license>
             <name>MIT License</name>
@@ -39,5 +57,14 @@
             <url>http://chenile.org</url>
         </site>
     </distributionManagement>
+
+    <profiles>
+        <profile>
+            <id>auth-integration-tests</id>
+            <modules>
+                <module>auth-framework/integration-tests</module>
+            </modules>
+        </profile>
+    </profiles>
 
 </project>
