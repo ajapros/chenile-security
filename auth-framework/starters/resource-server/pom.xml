@@ -13,6 +13,7 @@
     </parent>
 
     <artifactId>chenile-security-starter-resource-server</artifactId>
+    <name>chenile-security-starter-resource-server</name>
 
     <dependencies>
         <dependency>

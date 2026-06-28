@@ -13,6 +13,7 @@
     </parent>
 
     <artifactId>chenile-security-auth-server</artifactId>
+    <name>chenile-security-auth-server</name>
 
     <properties>
         <testcontainers.version>1.21.3</testcontainers.version>

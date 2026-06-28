@@ -13,6 +13,7 @@
     </parent>
 
     <artifactId>chenile-security-starter-auth-server</artifactId>
+    <name>chenile-security-starter-auth-server</name>
 
     <dependencies>
         <dependency>

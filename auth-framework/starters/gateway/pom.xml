@@ -13,6 +13,7 @@
     </parent>
 
     <artifactId>chenile-security-starter-gateway</artifactId>
+    <name>chenile-security-starter-gateway</name>
 
     <dependencies>
         <dependency>
