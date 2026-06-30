@@ -6,6 +6,11 @@ import org.chenile.security.auth.server.service.TokenService;
 import org.chenile.security.auth.framework.contract.AuthProviderType;
 import org.chenile.security.auth.framework.contract.ExternalProviderService;
 import org.chenile.security.auth.framework.contract.ExternalProviderService.ProviderConfigDefinition;
+import org.chenile.security.auth.framework.contract.MfaChallengeService;
+import org.chenile.security.auth.framework.contract.MfaChallengeService.MfaChallenge;
+import org.chenile.security.auth.framework.contract.MfaChallengeService.VerifiedMfaChallenge;
+import org.chenile.security.auth.framework.contract.MfaPolicyService;
+import org.chenile.security.auth.framework.contract.MfaPolicyService.MfaPolicy;
 import org.chenile.security.auth.framework.contract.TenantRegistry;
 import org.chenile.security.auth.framework.contract.TenantRegistry.AuthProviderDefinition;
 import org.chenile.security.auth.framework.contract.TenantRegistry.ClientDefinition;
@@ -20,7 +25,9 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.Optional;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -48,6 +55,8 @@ public class LoginFlowController {
 
     private final TenantRegistry tenantRegistry;
     private final ExternalProviderService externalProviderService;
+    private final Optional<MfaPolicyService> mfaPolicyService;
+    private final Optional<MfaChallengeService> mfaChallengeService;
     private final TokenService tokenService;
     private final AuthServerProperties properties;
     private final RestClient restClient;
@@ -57,6 +66,8 @@ public class LoginFlowController {
     public LoginFlowController(
             TenantRegistry tenantRegistry,
             ExternalProviderService externalProviderService,
+            ObjectProvider<MfaPolicyService> mfaPolicyService,
+            ObjectProvider<MfaChallengeService> mfaChallengeService,
             TokenService tokenService,
             AuthServerProperties properties,
             RestClient.Builder restClientBuilder,
@@ -64,6 +75,8 @@ public class LoginFlowController {
             @Value("${chenile.security.demo-ui.success-uri:http://localhost:5173/}") String successUri) {
         this.tenantRegistry = tenantRegistry;
         this.externalProviderService = externalProviderService;
+        this.mfaPolicyService = Optional.ofNullable(mfaPolicyService.getIfAvailable());
+        this.mfaChallengeService = Optional.ofNullable(mfaChallengeService.getIfAvailable());
         this.tokenService = tokenService;
         this.properties = properties;
         this.restClient = restClientBuilder.build();
@@ -110,38 +123,26 @@ public class LoginFlowController {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Authentication failed");
         }
 
-        List<String> scopes = tenantRegistry.defaultBrowserScopes();
-        ClientDefinition client = tenantRegistry.client(provider.realm(), "browser-login");
-        String accessToken = tokenService.issueUserToken(
-                provider.realm(),
-                "browser-login",
-                provider.username(),
-                scopes,
-                provider.acls(),
-                Map.of(
-                        "auth_provider", provider.providerKey(),
-                        "auth_provider_type", provider.providerType().name(),
-                        "email", provider.email()));
+        return issueOrChallenge(provider, provider.providerType(), Map.of());
+    }
 
-        return new LinkedHashMap<>(Map.of(
-                "generatedAt", Instant.now().toString(),
-                "tokenType", "Bearer",
-                "expiresIn", 600,
-                "accessToken", accessToken,
-                "tenant", Map.of(
-                        "realm", provider.realm(),
-                        "displayName", provider.realmDisplayName(),
-                        "issuer", tokenService.issuer(provider.realm())),
-                "user", Map.of(
-                        "id", provider.userId(),
-                        "username", provider.username(),
-                        "email", provider.email()),
-                "authentication", Map.of(
-                        "clientId", client.clientId(),
-                        "provider", toResolvedProviderPayload(provider),
-                        "scopes", scopes,
-                        "roles", provider.acls(),
-                        "acls", provider.acls())));
+    @PostMapping("/login/mfa/verify")
+    Map<String, Object> verifyMfa(@RequestBody MfaVerifyRequest request) {
+        if (request.challengeId() == null || request.challengeId().isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "challengeId is required");
+        }
+        if (request.code() == null || request.code().isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "code is required");
+        }
+        MfaChallengeService challengeService = mfaChallengeService
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "MFA is not configured"));
+        VerifiedMfaChallenge challenge = challengeService.verify(request.challengeId(), request.code());
+        ResolvedUserProvider provider = tenantRegistry.resolvedProvider(challenge.primaryProviderId(), challenge.email());
+        return issueToken(provider, challenge.clientId(), Map.of(
+                "mfa", true,
+                "mfa_provider", challenge.mfaProviderKey(),
+                "mfa_provider_type", challenge.mfaProviderType().name(),
+                "amr", amr(challenge.primaryProviderType(), challenge.mfaProviderType())));
     }
 
     @PostMapping("/login/google/start")
@@ -214,22 +215,14 @@ public class LoginFlowController {
             return;
         }
 
-        List<String> scopes = tenantRegistry.defaultBrowserScopes();
-        ClientDefinition client = tenantRegistry.client(provider.realm(), "browser-login");
-        String accessToken = tokenService.issueUserToken(
-                provider.realm(),
-                client.clientId(),
-                provider.username(),
-                scopes,
-                provider.acls(),
-                Map.of(
-                        "auth_provider", provider.providerKey(),
-                        "auth_provider_type", provider.providerType().name(),
-                        "email", provider.email(),
-                        "identity_provider", "google"));
+        Map<String, Object> responsePayload = issueOrChallenge(provider, AuthProviderType.GOOGLE, Map.of("identity_provider", "google"));
 
         request.getSession(false).removeAttribute(PENDING_EXTERNAL_LOGIN);
-        redirect(response, successUrl(accessToken));
+        if ("mfa".equals(responsePayload.get("nextStep"))) {
+            redirect(response, mfaUrl(responsePayload, provider.email()));
+        } else {
+            redirect(response, successUrl(String.valueOf(responsePayload.get("accessToken"))));
+        }
     }
 
     @GetMapping("/service/me")
@@ -257,7 +250,9 @@ public class LoginFlowController {
                 "authentication", Map.of(
                         "providerKey", stringClaim(claims, "auth_provider"),
                         "providerType", stringClaim(claims, "auth_provider_type"),
-                        "clientId", stringClaim(claims, "azp")),
+                        "clientId", stringClaim(claims, "azp"),
+                        "mfa", claims.getClaim("mfa") instanceof Boolean mfa && mfa,
+                        "amr", stringListClaim(claims, "amr")),
                 "access", Map.of(
                         "scopes", scopes == null ? List.of() : scopes,
                         "roles", roles == null ? List.of() : roles,
@@ -341,6 +336,107 @@ public class LoginFlowController {
                 "email", provider.email()));
     }
 
+    private Map<String, Object> issueOrChallenge(
+            ResolvedUserProvider provider,
+            AuthProviderType primaryProviderType,
+            Map<String, Object> additionalClaims) {
+        String clientId = "browser-login";
+        MfaPolicy policy = mfaPolicyService
+                .map(service -> service.evaluate(provider, clientId, primaryProviderType))
+                .orElse(MfaPolicy.notRequired());
+        if (policy.required()) {
+            MfaChallengeService challengeService = mfaChallengeService
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "MFA policy requires MFA but no challenge service is configured"));
+            MfaChallenge challenge = challengeService.start(provider, clientId, primaryProviderType, policy);
+            return new LinkedHashMap<>(Map.of(
+                    "generatedAt", Instant.now().toString(),
+                    "nextStep", "mfa",
+                    "challengeId", challenge.challengeId(),
+                    "expiresAt", challenge.expiresAt().toString(),
+                    "provider", Map.of(
+                            "providerKey", challenge.providerKey(),
+                            "providerType", challenge.providerType().name(),
+                            "providerLabel", challenge.displayName(),
+                            "destinationHint", challenge.destinationHint()),
+                    "tenant", Map.of(
+                            "realm", provider.realm(),
+                            "displayName", provider.realmDisplayName(),
+                            "issuer", tokenService.issuer(provider.realm())),
+                    "user", Map.of(
+                            "id", provider.userId(),
+                            "username", provider.username(),
+                            "email", provider.email()),
+                    "authentication", Map.of(
+                            "clientId", clientId,
+                            "provider", toResolvedProviderPayload(provider))));
+        }
+        return issueToken(provider, clientId, mergeClaims(additionalClaims, Map.of(
+                "mfa", false,
+                "amr", List.of(amrValue(primaryProviderType)))));
+    }
+
+    private Map<String, Object> issueToken(
+            ResolvedUserProvider provider,
+            String clientId,
+            Map<String, Object> additionalClaims) {
+        List<String> scopes = tenantRegistry.defaultBrowserScopes();
+        ClientDefinition client = tenantRegistry.client(provider.realm(), clientId);
+        Map<String, Object> claims = mergeClaims(additionalClaims, Map.of(
+                "auth_provider", provider.providerKey(),
+                "auth_provider_type", provider.providerType().name(),
+                "email", provider.email()));
+        String accessToken = tokenService.issueUserToken(
+                provider.realm(),
+                client.clientId(),
+                provider.username(),
+                scopes,
+                provider.acls(),
+                claims);
+
+        return new LinkedHashMap<>(Map.of(
+                "generatedAt", Instant.now().toString(),
+                "tokenType", "Bearer",
+                "expiresIn", 600,
+                "accessToken", accessToken,
+                "tenant", Map.of(
+                        "realm", provider.realm(),
+                        "displayName", provider.realmDisplayName(),
+                        "issuer", tokenService.issuer(provider.realm())),
+                "user", Map.of(
+                        "id", provider.userId(),
+                        "username", provider.username(),
+                        "email", provider.email()),
+                "authentication", Map.of(
+                        "clientId", client.clientId(),
+                        "provider", toResolvedProviderPayload(provider),
+                        "scopes", scopes,
+                        "roles", provider.acls(),
+                        "acls", provider.acls(),
+                        "mfa", claims.getOrDefault("mfa", false),
+                        "amr", claims.getOrDefault("amr", List.of()))));
+    }
+
+    private Map<String, Object> mergeClaims(Map<String, Object> left, Map<String, Object> right) {
+        LinkedHashMap<String, Object> claims = new LinkedHashMap<>();
+        claims.putAll(left);
+        claims.putAll(right);
+        return claims;
+    }
+
+    private List<String> amr(AuthProviderType primaryProviderType, AuthProviderType mfaProviderType) {
+        return List.of(amrValue(primaryProviderType), amrValue(mfaProviderType));
+    }
+
+    private String amrValue(AuthProviderType providerType) {
+        return switch (providerType) {
+            case PASSWORD -> "pwd";
+            case OTP, EMAIL_OTP, SMS_OTP -> "otp";
+            case GOOGLE -> "google";
+            case PUSH -> "push";
+            case EXTERNAL -> "external";
+        };
+    }
+
     private Map<String, Object> withServiceAccess(ServiceDefinition service, List<String> scopes) {
         return new LinkedHashMap<>(Map.of(
                 "service", service.getService(),
@@ -414,6 +510,13 @@ public class LoginFlowController {
         return successUri + "#access_token=" + urlEncode(accessToken);
     }
 
+    private String mfaUrl(Map<String, Object> payload, String email) {
+        return successUri
+                + "#next_step=mfa"
+                + "&challenge_id=" + urlEncode(String.valueOf(payload.get("challengeId")))
+                + "&email=" + urlEncode(email);
+    }
+
     private String failureUrl(String error) {
         return successUri + "#error=" + urlEncode(error);
     }
@@ -444,6 +547,9 @@ public class LoginFlowController {
     }
 
     private record AuthenticateRequest(String email, Long providerId, String credential) {
+    }
+
+    private record MfaVerifyRequest(String challengeId, String code) {
     }
 
     private record GoogleStartRequest(String email, Long providerId) {
