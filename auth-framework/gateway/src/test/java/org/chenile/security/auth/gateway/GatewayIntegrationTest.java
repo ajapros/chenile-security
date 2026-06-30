@@ -50,7 +50,13 @@ import java.util.LinkedHashMap;
                 "chenile.security.gateway.relay.headers[7].name=x-vymo-locale",
                 "chenile.security.gateway.relay.headers[7].claim=locale",
                 "chenile.security.gateway.relay.headers[8].name=vymo-locale",
-                "chenile.security.gateway.relay.headers[8].claim=vymo_locale"
+                "chenile.security.gateway.relay.headers[8].claim=vymo_locale",
+                "chenile.security.gateway.relay.headers[9].name=x-chenile-mfa",
+                "chenile.security.gateway.relay.headers[9].claim=mfa",
+                "chenile.security.gateway.relay.headers[10].name=x-chenile-amr",
+                "chenile.security.gateway.relay.headers[10].claim=amr",
+                "chenile.security.gateway.relay.headers[11].name=x-chenile-mfa-provider",
+                "chenile.security.gateway.relay.headers[11].claim=mfa_provider"
         })
 class GatewayIntegrationTest {
 
@@ -96,6 +102,9 @@ class GatewayIntegrationTest {
                 .claim("user_details", java.util.Map.of("branch", "mumbai", "role", "sales"))
                 .claim("locale", "en-IN")
                 .claim("vymo_locale", "hi-IN")
+                .claim("mfa", true)
+                .claim("amr", java.util.List.of("pwd", "otp"))
+                .claim("mfa_provider", "email-otp")
                 .claim("sub", "alice")
                 .claim("iss", "http://localhost:9000/realms/tenant-alpha")
                 .claim("aud", java.util.List.of("gateway"))
@@ -145,6 +154,15 @@ class GatewayIntegrationTest {
         org.assertj.core.api.Assertions.assertThat(
                         seenExchange.get().getRequest().getHeaders().getFirst("vymo-locale"))
                 .isEqualTo("hi-IN");
+        org.assertj.core.api.Assertions.assertThat(
+                        seenExchange.get().getRequest().getHeaders().getFirst("x-chenile-mfa"))
+                .isEqualTo("true");
+        org.assertj.core.api.Assertions.assertThat(
+                        seenExchange.get().getRequest().getHeaders().getFirst("x-chenile-amr").split(","))
+                .containsExactly("otp", "pwd");
+        org.assertj.core.api.Assertions.assertThat(
+                        seenExchange.get().getRequest().getHeaders().getFirst("x-chenile-mfa-provider"))
+                .isEqualTo("email-otp");
         org.assertj.core.api.Assertions.assertThat(
                         seenExchange.get().getRequest().getHeaders().getFirst(HttpHeaders.AUTHORIZATION))
                 .isEqualTo("Bearer " + INTEGRATION_TOKEN);
@@ -241,6 +259,9 @@ class GatewayIntegrationTest {
                         .claim("user_details", java.util.Map.of("branch", "mumbai", "role", "sales"))
                         .claim("locale", "en-IN")
                         .claim("vymo_locale", "hi-IN")
+                        .claim("mfa", true)
+                        .claim("amr", java.util.List.of("pwd", "otp"))
+                        .claim("mfa_provider", "email-otp")
                         .claim("sub", "alice")
                         .claim("iss", "http://localhost:9000/realms/tenant-alpha")
                         .claim("aud", java.util.List.of("gateway"))
