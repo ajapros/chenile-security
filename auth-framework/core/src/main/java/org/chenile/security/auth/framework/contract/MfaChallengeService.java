@@ -23,7 +23,7 @@ public interface MfaChallengeService {
             String challengeId,
             String realm,
             String email,
-            long primaryProviderId,
+            String primaryProviderId,
             String clientId,
             AuthProviderType primaryProviderType,
             String mfaProviderKey,

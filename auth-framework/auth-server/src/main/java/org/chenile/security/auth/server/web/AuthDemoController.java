@@ -48,7 +48,7 @@ public class AuthDemoController {
     @GetMapping("/context")
     Map<String, Object> demoContext(
             @RequestParam(required = false) String scenario,
-            @RequestParam(required = false) Long providerId) {
+            @RequestParam(required = false) String providerId) {
         String selectedScenarioKey = scenario == null || scenario.isBlank()
                 ? properties.getDemo().getScenarios().stream()
                         .findFirst()
@@ -67,10 +67,10 @@ public class AuthDemoController {
                     HttpStatus.NOT_FOUND, "No providers configured for " + selectedScenario.getEmail());
         }
 
-        long resolvedProviderId = providerId != null
+        String resolvedProviderId = providerId != null
                 ? providerId
                 : providers.getFirst().id();
-        boolean providerExists = providers.stream().anyMatch(candidate -> candidate.id() == resolvedProviderId);
+        boolean providerExists = providers.stream().anyMatch(candidate -> candidate.id().equals(resolvedProviderId));
         if (!providerExists) {
             throw new ResponseStatusException(
                     HttpStatus.NOT_FOUND, "Provider " + resolvedProviderId + " is not available for " + selectedScenario.getEmail());
@@ -82,8 +82,10 @@ public class AuthDemoController {
                 provider.realm(),
                 selectedScenario.getClientId(),
                 provider.username(),
+                provider.userId(),
                 scopes,
-                provider.acls());
+                provider.acls(),
+                Map.of());
 
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("generatedAt", Instant.now().toString());
@@ -101,7 +103,7 @@ public class AuthDemoController {
                 "id", provider.userId(),
                 "username", provider.username(),
                 "email", provider.email(),
-                "userIdClaim", provider.username()));
+                "userIdClaim", provider.userId()));
         payload.put("authentication", Map.of(
                 "clientId", selectedScenario.getClientId(),
                 "provider", toProviderPayload(provider),

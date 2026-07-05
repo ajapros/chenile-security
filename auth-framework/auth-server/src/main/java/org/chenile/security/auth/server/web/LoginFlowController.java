@@ -230,7 +230,7 @@ public class LoginFlowController {
         String tokenValue = bearerToken(authorization);
         JWTClaimsSet claims = tokenService.verifiedClaims(tokenValue);
         String tenant = stringClaim(claims, "tenant");
-        String username = stringClaim(claims, "user_id");
+        String username = stringClaim(claims, "preferred_username");
         UserDefinition user = tenantRegistry.user(tenant, username);
 
         List<String> scopes = stringListClaim(claims, "scp");
@@ -389,6 +389,7 @@ public class LoginFlowController {
                 provider.realm(),
                 client.clientId(),
                 provider.username(),
+                provider.userId(),
                 scopes,
                 provider.acls(),
                 claims);
@@ -546,15 +547,15 @@ public class LoginFlowController {
     private record IdentifyRequest(String email) {
     }
 
-    private record AuthenticateRequest(String email, Long providerId, String credential) {
+    private record AuthenticateRequest(String email, String providerId, String credential) {
     }
 
     private record MfaVerifyRequest(String challengeId, String code) {
     }
 
-    private record GoogleStartRequest(String email, Long providerId) {
+    private record GoogleStartRequest(String email, String providerId) {
     }
 
-    private record PendingExternalLogin(String email, long providerId, String realm, String providerKey, String state) {
+    private record PendingExternalLogin(String email, String providerId, String realm, String providerKey, String state) {
     }
 }

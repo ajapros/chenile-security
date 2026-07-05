@@ -98,7 +98,7 @@ class LoginFlowMfaIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.providers.length()").value(1))
                 .andExpect(jsonPath("$.nextStep").value("authenticate"))
-                .andExpect(jsonPath("$.autoSelectedProviderId").value(2));
+                .andExpect(jsonPath("$.autoSelectedProviderId").value("PROV-tenant-beta-password"));
     }
 
     @Test
@@ -125,7 +125,7 @@ class LoginFlowMfaIntegrationTest {
         MvcResult result = mockMvc.perform(post("/api/login/authenticate")
                         .contentType("application/json")
                         .content("""
-                                {"email":"bob@example.test","providerId":2,"credential":"password"}
+                                {"email":"bob@example.test","providerId":"PROV-tenant-beta-password","credential":"password"}
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.accessToken").exists())
@@ -147,7 +147,7 @@ class LoginFlowMfaIntegrationTest {
         MvcResult result = mockMvc.perform(post("/api/login/authenticate")
                         .contentType("application/json")
                         .content("""
-                                {"email":"bob@example.test","providerId":3,"credential":"246810"}
+                                {"email":"bob@example.test","providerId":"PROV-tenant-beta-otp","credential":"246810"}
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.accessToken").exists())
@@ -166,7 +166,7 @@ class LoginFlowMfaIntegrationTest {
         mockMvc.perform(post("/api/login/authenticate")
                         .contentType("application/json")
                         .content("""
-                                {"email":"alice@example.test","providerId":1,"credential":"password"}
+                                {"email":"alice@example.test","providerId":"PROV-tenant-alpha-password","credential":"password"}
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.nextStep").value("mfa"))
@@ -270,7 +270,7 @@ class LoginFlowMfaIntegrationTest {
         mockMvc.perform(post("/api/login/authenticate")
                         .contentType("application/json")
                         .content("""
-                                {"email":"bob@example.test","providerId":2,"credential":" "}
+                                {"email":"bob@example.test","providerId":"PROV-tenant-beta-password","credential":" "}
                                 """))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error").value("credential is required"));
@@ -278,7 +278,7 @@ class LoginFlowMfaIntegrationTest {
         mockMvc.perform(post("/api/login/authenticate")
                         .contentType("application/json")
                         .content("""
-                                {"email":"bob@example.test","providerId":2,"credential":"wrong"}
+                                {"email":"bob@example.test","providerId":"PROV-tenant-beta-password","credential":"wrong"}
                                 """))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.error").value("Authentication failed"));
@@ -286,7 +286,7 @@ class LoginFlowMfaIntegrationTest {
         mockMvc.perform(post("/api/login/authenticate")
                         .contentType("application/json")
                         .content("""
-                                {"email":"alice@example.test","providerId":4,"credential":"anything"}
+                                {"email":"alice@example.test","providerId":"PROV-tenant-alpha-google","credential":"anything"}
                                 """))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error").value("Google provider uses /api/login/google/start"));
@@ -356,7 +356,7 @@ class LoginFlowMfaIntegrationTest {
         TenantRegistry tenantRegistry() {
             return new TenantRegistry() {
                 public RealmDefinition realm(String tenant) {
-                    return new RealmDefinition(1, tenant, tenant);
+                    return new RealmDefinition("REALM-" + tenant, tenant, tenant);
                 }
 
                 public boolean realmExists(String tenant) {
@@ -381,7 +381,7 @@ class LoginFlowMfaIntegrationTest {
                     } else if ("bob".equals(username)) {
                         email = "bob@example.test";
                     }
-                    return new UserDefinition(1, tenant, username, email, "password", List.of("role:user"));
+                    return new UserDefinition("USR-" + tenant + "-" + username, tenant, username, email, "password", List.of("role:user"));
                 }
 
                 public boolean matchesUserPassword(UserDefinition user, String rawPassword) {
@@ -399,26 +399,26 @@ class LoginFlowMfaIntegrationTest {
                 public List<AuthProviderDefinition> providersForEmail(String email) {
                     return switch (email) {
                         case "alice@example.test" -> List.of(
-                                provider(1, "tenant-alpha", "alice", email, "local-password", "Password", AuthProviderType.PASSWORD),
-                                provider(4, "tenant-alpha", "alice", email, "google", "Google", AuthProviderType.GOOGLE));
+                                provider("PROV-tenant-alpha-password", "tenant-alpha", "alice", email, "local-password", "Password", AuthProviderType.PASSWORD),
+                                provider("PROV-tenant-alpha-google", "tenant-alpha", "alice", email, "google", "Google", AuthProviderType.GOOGLE));
                         case "bob@example.test" -> List.of(
-                                provider(2, "tenant-beta", "bob", email, "local-password", "Password", AuthProviderType.PASSWORD));
+                                provider("PROV-tenant-beta-password", "tenant-beta", "bob", email, "local-password", "Password", AuthProviderType.PASSWORD));
                         default -> List.of();
                     };
                 }
 
-                public ResolvedUserProvider resolvedProvider(long providerId, String email) {
-                    return switch ((int) providerId) {
-                        case 1 -> resolved(1, "tenant-alpha", "alice", "alice@example.test", "local-password", "Password", AuthProviderType.PASSWORD);
-                        case 2 -> resolved(2, "tenant-beta", "bob", "bob@example.test", "local-password", "Password", AuthProviderType.PASSWORD);
-                        case 3 -> resolved(3, "tenant-beta", "bob", "bob@example.test", "login-otp", "Login OTP", AuthProviderType.OTP);
-                        case 4 -> resolved(4, "tenant-alpha", "alice", "alice@example.test", "google", "Google", AuthProviderType.GOOGLE);
+                public ResolvedUserProvider resolvedProvider(String providerId, String email) {
+                    return switch (providerId) {
+                        case "PROV-tenant-alpha-password" -> resolved("PROV-tenant-alpha-password", "tenant-alpha", "alice", "alice@example.test", "local-password", "Password", AuthProviderType.PASSWORD);
+                        case "PROV-tenant-beta-password" -> resolved("PROV-tenant-beta-password", "tenant-beta", "bob", "bob@example.test", "local-password", "Password", AuthProviderType.PASSWORD);
+                        case "PROV-tenant-beta-otp" -> resolved("PROV-tenant-beta-otp", "tenant-beta", "bob", "bob@example.test", "login-otp", "Login OTP", AuthProviderType.OTP);
+                        case "PROV-tenant-alpha-google" -> resolved("PROV-tenant-alpha-google", "tenant-alpha", "alice", "alice@example.test", "google", "Google", AuthProviderType.GOOGLE);
                         default -> throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Provider not found");
                     };
                 }
 
-                public boolean authenticate(long providerId, String email, String secret) {
-                    if (providerId == 3) {
+                public boolean authenticate(String providerId, String email, String secret) {
+                    if ("PROV-tenant-beta-otp".equals(providerId)) {
                         return "246810".equals(secret);
                     }
                     return "password".equals(secret);
@@ -433,7 +433,7 @@ class LoginFlowMfaIntegrationTest {
                 }
 
                 private AuthProviderDefinition provider(
-                        long id,
+                        String id,
                         String realm,
                         String username,
                         String email,
@@ -449,11 +449,11 @@ class LoginFlowMfaIntegrationTest {
                             providerKey,
                             providerLabel,
                             providerType,
-                            (int) id);
+                            10);
                 }
 
                 private ResolvedUserProvider resolved(
-                        long id,
+                        String id,
                         String realm,
                         String username,
                         String email,
@@ -464,7 +464,7 @@ class LoginFlowMfaIntegrationTest {
                             id,
                             realm,
                             realm,
-                            id,
+                            "USR-" + realm + "-" + username,
                             username,
                             email,
                             providerKey,
@@ -524,7 +524,7 @@ class LoginFlowMfaIntegrationTest {
                             challengeId,
                             "tenant-alpha",
                             "alice@example.test",
-                            1,
+	                            "PROV-tenant-alpha-password",
                             "browser-login",
                             AuthProviderType.PASSWORD,
                             "email-otp",

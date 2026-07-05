@@ -63,10 +63,21 @@ public class TokenService {
             List<String> scopes,
             List<String> acls,
             Map<String, Object> additionalClaims) {
+        return issueUserToken(tenant, clientId, username, username, scopes, acls, additionalClaims);
+    }
+
+    public String issueUserToken(
+            String tenant,
+            String clientId,
+            String username,
+            String userId,
+            List<String> scopes,
+            List<String> acls,
+            Map<String, Object> additionalClaims) {
         java.util.LinkedHashMap<String, Object> claims = new java.util.LinkedHashMap<>();
         claims.put("tenant", tenant);
         claims.putAll(additionalClaims);
-        return signToken(tenant, username, clientId, scopes, acls, username, claims);
+        return signToken(tenant, username, clientId, scopes, acls, userId, claims);
     }
 
     public boolean isAdminToken(String tokenValue) {
@@ -118,7 +129,7 @@ public class TokenService {
                     .subject(subject)
                     .claim("azp", authorizedParty)
                     .claim("user_id", userId)
-                    .claim("preferred_username", userId)
+                    .claim("preferred_username", subject)
                     .claim("scope", String.join(" ", scopes))
                     .claim("scp", scopes)
                     .issueTime(Date.from(now))

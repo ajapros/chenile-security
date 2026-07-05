@@ -290,7 +290,7 @@ class AuthControllerIntegrationTest {
         }
 
         public RealmDefinition realm(String tenant) {
-            return new RealmDefinition(1, tenant, tenant);
+            return new RealmDefinition("REALM-" + tenant, tenant, tenant);
         }
 
         public boolean realmExists(String tenant) {
@@ -318,7 +318,7 @@ class AuthControllerIntegrationTest {
         }
 
         public UserDefinition user(String tenant, String username) {
-            return new UserDefinition(1, tenant, username, username + "@example.test", "password", List.of("orders:read"));
+            return new UserDefinition("USR-" + tenant + "-" + username, tenant, username, username + "@example.test", "password", List.of("orders:read"));
         }
 
         public boolean matchesUserPassword(UserDefinition user, String rawPassword) {
@@ -340,11 +340,11 @@ class AuthControllerIntegrationTest {
             return List.of();
         }
 
-        public ResolvedUserProvider resolvedProvider(long providerId, String email) {
+        public ResolvedUserProvider resolvedProvider(String providerId, String email) {
             throw new UnsupportedOperationException();
         }
 
-        public boolean authenticate(long providerId, String email, String secret) {
+        public boolean authenticate(String providerId, String email, String secret) {
             return false;
         }
 

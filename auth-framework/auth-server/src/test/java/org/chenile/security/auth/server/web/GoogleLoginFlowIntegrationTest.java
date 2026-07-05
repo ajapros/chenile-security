@@ -117,7 +117,7 @@ class GoogleLoginFlowIntegrationTest {
         MvcResult result = mockMvc.perform(post("/api/login/google/start")
                         .contentType("application/json")
                         .content("""
-                                {"email":"bob@example.test","providerId":5}
+                                {"email":"bob@example.test","providerId":"PROV-tenant-beta-google"}
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.provider.providerType").value("GOOGLE"))
@@ -138,7 +138,7 @@ class GoogleLoginFlowIntegrationTest {
         mockMvc.perform(post("/api/login/google/start")
                         .contentType("application/json")
                         .content("""
-                                {"email":"bob@example.test","providerId":2}
+                                {"email":"bob@example.test","providerId":"PROV-tenant-beta-password"}
                                 """))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error").value("Selected provider is not Google"));
@@ -146,7 +146,7 @@ class GoogleLoginFlowIntegrationTest {
         mockMvc.perform(post("/api/login/google/start")
                         .contentType("application/json")
                         .content("""
-                                {"email":"config-broken@example.test","providerId":6}
+                                {"email":"config-broken@example.test","providerId":"PROV-tenant-beta-broken-google"}
                                 """))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error").value("Provider config is incomplete in DB for tenant-beta/broken-google"));
@@ -154,7 +154,7 @@ class GoogleLoginFlowIntegrationTest {
 
     @Test
     void googleCallbackRedirectsWithAccessTokenWhenMfaIsNotRequired() throws Exception {
-        MvcResult start = startGoogle("bob@example.test", 5);
+        MvcResult start = startGoogle("bob@example.test", "PROV-tenant-beta-google");
         String state = state(start);
 
         mockMvc.perform(get("/api/login/google/callback")
@@ -168,7 +168,7 @@ class GoogleLoginFlowIntegrationTest {
     @Test
     void googleCallbackRedirectsToMfaWhenTenantPolicyRequiresMfa() throws Exception {
         USER_INFO_EMAIL.set("alice@example.test");
-        MvcResult start = startGoogle("alice@example.test", 4);
+        MvcResult start = startGoogle("alice@example.test", "PROV-tenant-alpha-google");
 
         mockMvc.perform(get("/api/login/google/callback")
                         .session((MockHttpSession) start.getRequest().getSession(false))
@@ -189,7 +189,7 @@ class GoogleLoginFlowIntegrationTest {
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.error").value("Missing external login session"));
 
-        MvcResult start = startGoogle("bob@example.test", 5);
+        MvcResult start = startGoogle("bob@example.test", "PROV-tenant-beta-google");
         mockMvc.perform(get("/api/login/google/callback")
                         .session((MockHttpSession) start.getRequest().getSession(false))
                         .param("code", "code-ok")
@@ -206,11 +206,11 @@ class GoogleLoginFlowIntegrationTest {
                 .andExpect(header().string(HttpHeaders.LOCATION, "http://localhost:5173/#error=google_email_mismatch"));
     }
 
-    private MvcResult startGoogle(String email, long providerId) throws Exception {
+    private MvcResult startGoogle(String email, String providerId) throws Exception {
         return mockMvc.perform(post("/api/login/google/start")
                         .contentType("application/json")
                         .content("""
-                                {"email":"%s","providerId":%d}
+                                {"email":"%s","providerId":"%s"}
                                 """.formatted(email, providerId)))
                 .andExpect(status().isOk())
                 .andReturn();
@@ -247,7 +247,7 @@ class GoogleLoginFlowIntegrationTest {
         TenantRegistry tenantRegistry() {
             return new TenantRegistry() {
                 public RealmDefinition realm(String tenant) {
-                    return new RealmDefinition(1, tenant, tenant);
+                    return new RealmDefinition("REALM-" + tenant, tenant, tenant);
                 }
 
                 public boolean realmExists(String tenant) {
@@ -266,7 +266,7 @@ class GoogleLoginFlowIntegrationTest {
                 }
 
                 public UserDefinition user(String tenant, String username) {
-                    return new UserDefinition(1, tenant, username, username + "@example.test", "password", List.of("role:user"));
+                    return new UserDefinition("USR-" + tenant + "-" + username, tenant, username, username + "@example.test", "password", List.of("role:user"));
                 }
 
                 public boolean matchesUserPassword(UserDefinition user, String rawPassword) {
@@ -285,17 +285,17 @@ class GoogleLoginFlowIntegrationTest {
                     return List.of();
                 }
 
-                public ResolvedUserProvider resolvedProvider(long providerId, String email) {
-                    return switch ((int) providerId) {
-                        case 2 -> resolved(2, "tenant-beta", "bob", "bob@example.test", "local-password", "Password", AuthProviderType.PASSWORD);
-                        case 4 -> resolved(4, "tenant-alpha", "alice", "alice@example.test", "google", "Google", AuthProviderType.GOOGLE);
-                        case 5 -> resolved(5, "tenant-beta", "bob", "bob@example.test", "google", "Google", AuthProviderType.GOOGLE);
-                        case 6 -> resolved(6, "tenant-beta", "config-broken", "config-broken@example.test", "broken-google", "Broken Google", AuthProviderType.GOOGLE);
+                public ResolvedUserProvider resolvedProvider(String providerId, String email) {
+                    return switch (providerId) {
+                        case "PROV-tenant-beta-password" -> resolved("PROV-tenant-beta-password", "tenant-beta", "bob", "bob@example.test", "local-password", "Password", AuthProviderType.PASSWORD);
+                        case "PROV-tenant-alpha-google" -> resolved("PROV-tenant-alpha-google", "tenant-alpha", "alice", "alice@example.test", "google", "Google", AuthProviderType.GOOGLE);
+                        case "PROV-tenant-beta-google" -> resolved("PROV-tenant-beta-google", "tenant-beta", "bob", "bob@example.test", "google", "Google", AuthProviderType.GOOGLE);
+                        case "PROV-tenant-beta-broken-google" -> resolved("PROV-tenant-beta-broken-google", "tenant-beta", "config-broken", "config-broken@example.test", "broken-google", "Broken Google", AuthProviderType.GOOGLE);
                         default -> throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Provider not found");
                     };
                 }
 
-                public boolean authenticate(long providerId, String email, String secret) {
+                public boolean authenticate(String providerId, String email, String secret) {
                     return false;
                 }
 
@@ -308,7 +308,7 @@ class GoogleLoginFlowIntegrationTest {
                 }
 
                 private ResolvedUserProvider resolved(
-                        long id,
+                        String id,
                         String realm,
                         String username,
                         String email,
@@ -319,7 +319,7 @@ class GoogleLoginFlowIntegrationTest {
                             id,
                             realm,
                             realm,
-                            id,
+                            "USR-" + realm + "-" + username,
                             username,
                             email,
                             providerKey,

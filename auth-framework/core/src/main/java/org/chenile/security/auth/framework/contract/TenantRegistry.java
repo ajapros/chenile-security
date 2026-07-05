@@ -25,15 +25,15 @@ public interface TenantRegistry {
 
     List<AuthProviderDefinition> providersForEmail(String email);
 
-    ResolvedUserProvider resolvedProvider(long providerId, String email);
+    ResolvedUserProvider resolvedProvider(String providerId, String email);
 
-    boolean authenticate(long providerId, String email, String secret);
+    boolean authenticate(String providerId, String email, String secret);
 
     List<String> defaultBrowserScopes();
 
     Map<String, Object> createRealmPayload(String tenant);
 
-    record RealmDefinition(long id, String name, String displayName) {
+    record RealmDefinition(String id, String name, String displayName) {
     }
 
     record ClientDefinition(
@@ -49,7 +49,7 @@ public interface TenantRegistry {
     }
 
     record UserDefinition(
-            long id,
+            String id,
             String realm,
             String username,
             String email,
@@ -58,7 +58,7 @@ public interface TenantRegistry {
     }
 
     record AuthProviderDefinition(
-            long id,
+            String id,
             String realm,
             String realmDisplayName,
             String username,
@@ -70,10 +70,10 @@ public interface TenantRegistry {
     }
 
     record ResolvedUserProvider(
-            long id,
+            String id,
             String realm,
             String realmDisplayName,
-            long userId,
+            String userId,
             String username,
             String email,
             String providerKey,
