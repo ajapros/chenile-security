@@ -397,7 +397,7 @@ public class LoginFlowController {
         return new LinkedHashMap<>(Map.of(
                 "generatedAt", Instant.now().toString(),
                 "tokenType", "Bearer",
-                "expiresIn", 600,
+                "expiresIn", tokenService.accessTokenTtlSeconds(),
                 "accessToken", accessToken,
                 "tenant", Map.of(
                         "realm", provider.realm(),

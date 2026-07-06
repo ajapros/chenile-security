@@ -90,7 +90,7 @@ public class AuthController {
 
         return Map.of(
                 "access_token", accessToken,
-                "expires_in", 600,
+                "expires_in", tokenService.accessTokenTtlSeconds(),
                 "scope", String.join(" ", allowedScopes),
                 "token_type", "Bearer");
     }

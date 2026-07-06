@@ -42,6 +42,7 @@ import org.springframework.http.HttpStatus;
         },
         properties = {
                 "chenile.security.issuer-base=http://localhost:9000",
+                "chenile.security.auth-server.token.access-token-ttl-seconds=1234",
                 "chenile.security.auth-server.token.audiences.gateway.access=gateway",
                 "chenile.security.auth-server.token.audiences.service-a.read=service-a"
         })
@@ -99,6 +100,7 @@ class AuthControllerIntegrationTest {
                         .param("scope", "gateway.access service-a.read unknown.scope"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.token_type").value("Bearer"))
+                .andExpect(jsonPath("$.expires_in").value(1234))
                 .andExpect(jsonPath("$.scope").value("gateway.access service-a.read"))
                 .andReturn();
 
@@ -106,6 +108,7 @@ class AuthControllerIntegrationTest {
         assertThat(claims.getStringClaim("tenant")).isEqualTo("tenant-alpha");
         assertThat(claims.getSubject()).isEqualTo("service-client");
         assertThat(claims.getAudience()).containsExactlyInAnyOrder("gateway", "service-a");
+        assertThat(tokenLifetimeSeconds(claims)).isEqualTo(1234);
     }
 
     @Test
@@ -116,8 +119,9 @@ class AuthControllerIntegrationTest {
                         .param("client_id", "browser-login")
                         .param("username", "alice")
                         .param("password", "password")
-                        .param("scope", "gateway.access"))
+                .param("scope", "gateway.access"))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.expires_in").value(1234))
                 .andExpect(jsonPath("$.scope").value("gateway.access"))
                 .andReturn();
 
@@ -125,6 +129,11 @@ class AuthControllerIntegrationTest {
         assertThat(claims.getSubject()).isEqualTo("alice");
         assertThat(claims.getStringListClaim("roles")).containsExactly("orders:read");
         assertThat(claims.getStringClaim("azp")).isEqualTo("browser-login");
+        assertThat(tokenLifetimeSeconds(claims)).isEqualTo(1234);
+    }
+
+    private long tokenLifetimeSeconds(JWTClaimsSet claims) {
+        return (claims.getExpirationTime().getTime() - claims.getIssueTime().getTime()) / 1000;
     }
 
     @Test

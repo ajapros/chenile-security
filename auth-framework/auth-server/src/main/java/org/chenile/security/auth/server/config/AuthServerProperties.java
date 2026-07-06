@@ -22,6 +22,7 @@ public class AuthServerProperties {
 
     public static class Token {
         private Map<String, String> audiences = new LinkedHashMap<>(Map.of("gateway.access", "gateway"));
+        private long accessTokenTtlSeconds = 600;
 
         public Map<String, String> getAudiences() {
             return audiences;
@@ -29,6 +30,14 @@ public class AuthServerProperties {
 
         public void setAudiences(Map<String, String> audiences) {
             this.audiences = audiences == null ? new LinkedHashMap<>() : audiences;
+        }
+
+        public long getAccessTokenTtlSeconds() {
+            return accessTokenTtlSeconds;
+        }
+
+        public void setAccessTokenTtlSeconds(long accessTokenTtlSeconds) {
+            this.accessTokenTtlSeconds = accessTokenTtlSeconds > 0 ? accessTokenTtlSeconds : 600;
         }
     }
 

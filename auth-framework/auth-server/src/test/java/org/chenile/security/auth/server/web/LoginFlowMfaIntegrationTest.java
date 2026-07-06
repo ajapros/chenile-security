@@ -45,6 +45,7 @@ import org.springframework.http.HttpStatus;
                 LoginFlowMfaIntegrationTest.TestConfig.class
         },
         properties = {
+                "chenile.security.auth-server.token.access-token-ttl-seconds=2345",
                 "chenile.security.auth-server.token.audiences.gateway.access=gateway",
                 "chenile.security.issuer-base=http://localhost:9000"
         })
@@ -129,6 +130,7 @@ class LoginFlowMfaIntegrationTest {
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.accessToken").exists())
+                .andExpect(jsonPath("$.expiresIn").value(2345))
                 .andExpect(jsonPath("$.authentication.mfa").value(false))
                 .andExpect(jsonPath("$.authentication.amr[0]").value("pwd"))
                 .andReturn();
@@ -139,6 +141,7 @@ class LoginFlowMfaIntegrationTest {
         assertThat(claims.getStringClaim("auth_provider")).isEqualTo("local-password");
         assertThat(claims.getStringClaim("auth_provider_type")).isEqualTo("PASSWORD");
         assertThat(claims.getAudience()).containsExactly("gateway");
+        assertThat(tokenLifetimeSeconds(claims)).isEqualTo(2345);
         assertThat(recorder.lastPolicyProviderType()).isEqualTo(AuthProviderType.PASSWORD);
     }
 
@@ -192,6 +195,7 @@ class LoginFlowMfaIntegrationTest {
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.accessToken").exists())
+                .andExpect(jsonPath("$.expiresIn").value(2345))
                 .andExpect(jsonPath("$.authentication.mfa").value(true))
                 .andExpect(jsonPath("$.authentication.amr[0]").value("pwd"))
                 .andExpect(jsonPath("$.authentication.amr[1]").value("otp"))
@@ -204,6 +208,11 @@ class LoginFlowMfaIntegrationTest {
         assertThat(claims.getStringListClaim("amr")).containsExactly("pwd", "otp");
         assertThat(claims.getStringClaim("auth_provider")).isEqualTo("local-password");
         assertThat(claims.getStringClaim("auth_provider_type")).isEqualTo("PASSWORD");
+        assertThat(tokenLifetimeSeconds(claims)).isEqualTo(2345);
+    }
+
+    private long tokenLifetimeSeconds(JWTClaimsSet claims) {
+        return (claims.getExpirationTime().getTime() - claims.getIssueTime().getTime()) / 1000;
     }
 
     @Test

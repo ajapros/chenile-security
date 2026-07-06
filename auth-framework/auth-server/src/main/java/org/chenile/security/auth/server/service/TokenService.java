@@ -48,6 +48,10 @@ public class TokenService {
         return new JWKSet(rsaKey.toPublicJWK()).toJSONObject();
     }
 
+    public long accessTokenTtlSeconds() {
+        return properties.getToken().getAccessTokenTtlSeconds();
+    }
+
     public String issueClientToken(String tenant, String clientId, List<String> scopes) {
         return signToken(tenant, clientId, clientId, scopes, List.of(), clientId, Map.of("tenant", tenant));
     }
@@ -133,7 +137,7 @@ public class TokenService {
                     .claim("scope", String.join(" ", scopes))
                     .claim("scp", scopes)
                     .issueTime(Date.from(now))
-                    .expirationTime(Date.from(now.plusSeconds(600)))
+                    .expirationTime(Date.from(now.plusSeconds(accessTokenTtlSeconds())))
                     .jwtID(UUID.randomUUID().toString());
 
             if (!audiences.isEmpty()) {
